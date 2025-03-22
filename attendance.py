@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 
 # URL of the Raspberry Pi API (Replace with actual IP)
-RPI_SERVER = "http://192.168.0.168/attendance"  # Change to your RPI IP
+RPI_SERVER = "http://192.168.0.168:5000/attendance"  # Change to your RPI IP
 
 def load_data():
     try:
