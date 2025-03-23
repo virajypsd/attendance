@@ -1,41 +1,50 @@
 import streamlit as st
 import pandas as pd
-import os
-import requests
 from datetime import datetime
+import os
 
-# File to store attendance
+# File to store attendance data
 ATTENDANCE_FILE = "attendance.csv"
-API_URL = "http://your-raspberry-pi-ip:5000/attendance"  # Replace with actual API endpoint
 
-# Function to load attendance data
-def load_attendance():
-    if os.path.exists(ATTENDANCE_FILE):
-        return pd.read_csv(ATTENDANCE_FILE)
-    else:
-        return pd.DataFrame(columns=["Name", "Date", "Time"])
+# Initialize attendance file if not exists
+def init_file():
+    if not os.path.exists(ATTENDANCE_FILE):
+        df = pd.DataFrame(columns=["Name", "Date", "Time"])
+        df.to_csv(ATTENDANCE_FILE, index=False)
 
-# Function to save attendance data
-def save_attendance(df):
+# Function to mark attendance
+def mark_attendance(name):
+    df = pd.read_csv(ATTENDANCE_FILE)
+    now = datetime.now()
+    new_entry = pd.DataFrame([[name, now.strftime('%Y-%m-%d'), now.strftime('%H:%M:%S')]], columns=["Name", "Date", "Time"])
+    df = pd.concat([df, new_entry], ignore_index=True)
     df.to_csv(ATTENDANCE_FILE, index=False)
+    st.success(f"Attendance marked for {name}")
 
-# Function to fetch attendance data from API
-def fetch_attendance_from_api():
-    try:
-        response = requests.get(API_URL)
-        if response.status_code == 200:
-            return pd.DataFrame(response.json())
-        else:
-            st.error("Failed to fetch attendance from API")
-            return load_attendance()
-    except Exception as e:
-        st.error(f"Error fetching data: {e}")
-        return load_attendance()
+# Function to load attendance records
+def load_attendance():
+    return pd.read_csv(ATTENDANCE_FILE)
 
 # Streamlit UI
-st.title("📋 Attendance Management System")
+st.title("Attendance Management System")
 
-# Fetch and display attendance from API
-st.subheader("📊 Attendance Records (API Fetched)")
-attendance_data = fetch_attendance_from_api()
-st.dataframe(attendance_data)
+init_file()
+
+menu = ["Mark Attendance", "View Attendance"]
+choice = st.sidebar.selectbox("Menu", menu)
+
+if choice == "Mark Attendance":
+    name = st.text_input("Enter Name:")
+    if st.button("Mark Attendance"):
+        if name:
+            mark_attendance(name)
+        else:
+            st.warning("Please enter a name.")
+
+elif choice == "View Attendance":
+    df = load_attendance()
+    st.dataframe(df)
+    
+    if st.button("Download CSV"):
+        df.to_csv("attendance_export.csv", index=False)
+        st.download_button(label="Download", data=open("attendance_export.csv", "rb"), file_name="attendance.csv", mime="text/csv")
