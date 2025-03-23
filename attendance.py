@@ -1,33 +1,41 @@
-from flask import Flask, jsonify, request
+import streamlit as st
 import pandas as pd
+import os
+import requests
+from datetime import datetime
 
-app = Flask(__name__)
+# File to store attendance
+ATTENDANCE_FILE = "attendance.csv"
+API_URL = "http://your-raspberry-pi-ip:5000/attendance"  # Replace with actual API endpoint
 
-# Load attendance data
+# Function to load attendance data
 def load_attendance():
-    try:
-        df = pd.read_csv("attendance.csv")
-        return df.to_dict(orient="records")  # Convert to JSON
-    except:
-        return []
+    if os.path.exists(ATTENDANCE_FILE):
+        return pd.read_csv(ATTENDANCE_FILE)
+    else:
+        return pd.DataFrame(columns=["Name", "Date", "Time"])
 
-@app.route("/attendance", methods=["GET"])
-def get_attendance():
-    """Return attendance data as JSON"""
-    data = load_attendance()
-    return jsonify(data)
+# Function to save attendance data
+def save_attendance(df):
+    df.to_csv(ATTENDANCE_FILE, index=False)
 
-@app.route("/update_attendance", methods=["POST"])
-def update_attendance():
-    """Receive new attendance data"""
+# Function to fetch attendance data from API
+def fetch_attendance_from_api():
     try:
-        new_data = request.json
-        df = pd.DataFrame(new_data)
-        df.to_csv("attendance.csv", index=False, mode="a", header=False)
-        return jsonify({"message": "Attendance updated successfully!"}), 200
+        response = requests.get(API_URL)
+        if response.status_code == 200:
+            return pd.DataFrame(response.json())
+        else:
+            st.error("Failed to fetch attendance from API")
+            return load_attendance()
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        st.error(f"Error fetching data: {e}")
+        return load_attendance()
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+# Streamlit UI
+st.title("📋 Attendance Management System")
 
+# Fetch and display attendance from API
+st.subheader("📊 Attendance Records (API Fetched)")
+attendance_data = fetch_attendance_from_api()
+st.dataframe(attendance_data)
