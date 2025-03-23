@@ -1,50 +1,33 @@
 import streamlit as st
-import pandas as pd
+from flask import Flask, render_template, request
+import sqlite3
 from datetime import datetime
-import os
 
-# File to store attendance data
-ATTENDANCE_FILE = "attendance.csv"
+app = Flask(__name__)
 
-# Initialize attendance file if not exists
-def init_file():
-    if not os.path.exists(ATTENDANCE_FILE):
-        df = pd.DataFrame(columns=["Name", "Date", "Time"])
-        df.to_csv(ATTENDANCE_FILE, index=False)
+@app.route('/')
+def index():
+    return render_template('index.html', selected_date='', no_data=False)
 
-# Function to mark attendance
-def mark_attendance(name):
-    df = pd.read_csv(ATTENDANCE_FILE)
-    now = datetime.now()
-    new_entry = pd.DataFrame([[name, now.strftime('%Y-%m-%d'), now.strftime('%H:%M:%S')]], columns=["Name", "Date", "Time"])
-    df = pd.concat([df, new_entry], ignore_index=True)
-    df.to_csv(ATTENDANCE_FILE, index=False)
-    st.success(f"Attendance marked for {name}")
+@app.route('/attendance', methods=['POST'])
+def attendance():
+    selected_date = request.form.get('selected_date')
+    selected_date_obj = datetime.strptime(selected_date, '%Y-%m-%d')
+    formatted_date = selected_date_obj.strftime('%Y-%m-%d')
 
-# Function to load attendance records
-def load_attendance():
-    return pd.read_csv(ATTENDANCE_FILE)
+    conn = sqlite3.connect('attendance.db')
+    cursor = conn.cursor()
 
-# Streamlit UI
-st.title("Attendance Management System")
+    cursor.execute("SELECT name, time FROM attendance WHERE date = ?", (formatted_date,))
+    attendance_data = cursor.fetchall()
 
-init_file()
+    conn.close()
 
-menu = ["Mark Attendance", "View Attendance"]
-choice = st.sidebar.selectbox("Menu", menu)
-
-if choice == "Mark Attendance":
-    name = st.text_input("Enter Name:")
-    if st.button("Mark Attendance"):
-        if name:
-            mark_attendance(name)
-        else:
-            st.warning("Please enter a name.")
-
-elif choice == "View Attendance":
-    df = load_attendance()
-    st.dataframe(df)
+    if not attendance_data:
+        return render_template('index.html', selected_date=selected_date, no_data=True)
     
-    if st.button("Download CSV"):
-        df.to_csv("attendance_export.csv", index=False)
+    return render_template('index.html', selected_date=selected_date, attendance_data=attendance_data)
+
+if __name__ == '__main__':
+    app.run(debug=True)=False)
         st.download_button(label="Download", data=open("attendance_export.csv", "rb"), file_name="attendance.csv", mime="text/csv")
