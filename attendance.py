@@ -1,24 +1,57 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
+import firebase_admin
+from firebase_admin import credentials, db
+import datetime
+import io
 
-DB_FILE = "attendance.db"
+# Firebase setup
+cred = credentials.Certificate("path/to/your/firebase/credentials.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://your-database-url.firebaseio.com/'
+})
 
-st.title("📸 Face Recognition Attendance System")
+def fetch_attendance():
+    ref = db.reference("attendance")
+    data = ref.get()
+    if data:
+        return pd.DataFrame(data).T
+    return pd.DataFrame(columns=["student_name", "lecture", "date", "time", "status"])
 
-# Connect to database
-conn = sqlite3.connect(DB_FILE)
-c = conn.cursor()
+# Streamlit UI
+st.title("College Attendance Management System")
+role = st.selectbox("Select Role", ["Student", "Admin"])
 
-# Ensure the table exists
-c.execute('''CREATE TABLE IF NOT EXISTS attendance (name TEXT, time TEXT)''')
-conn.commit()
+data = fetch_attendance()
 
-# Fetch data safely
-try:
-    df = pd.read_sql("SELECT * FROM attendance", conn)
-    st.dataframe(df)
-except Exception as e:
-    st.error(f"⚠️ Error loading attendance data: {e}")
+date_filter = st.date_input("Filter by Date", datetime.date.today())
+lecture_filter = st.text_input("Filter by Lecture")
+student_filter = st.text_input("Filter by Student Name")
 
-conn.close()
+if not data.empty:
+    data['date'] = pd.to_datetime(data['date']).dt.date
+    filtered_data = data[(data['date'] == date_filter)]
+    
+    if lecture_filter:
+        filtered_data = filtered_data[filtered_data['lecture'].str.contains(lecture_filter, case=False)]
+    if student_filter:
+        filtered_data = filtered_data[filtered_data['student_name'].str.contains(student_filter, case=False)]
+    
+    st.dataframe(filtered_data)
+    
+    # Export options
+    export_format = st.radio("Export Data As", ["CSV", "Excel", "PDF"])
+    
+    if st.button("Download Data"):
+        if export_format == "CSV":
+            csv = filtered_data.to_csv(index=False).encode()
+            st.download_button("Download CSV", csv, "attendance.csv", "text/csv")
+        elif export_format == "Excel":
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                filtered_data.to_excel(writer, index=False, sheet_name='Attendance')
+            st.download_button("Download Excel", output.getvalue(), "attendance.xlsx")
+        elif export_format == "PDF":
+            st.warning("PDF export not yet implemented.")
+else:
+    st.warning("No attendance records found.")
