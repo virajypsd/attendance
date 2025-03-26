@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 # Set your Raspberry Pi's IP address here
-RASPBERRY_PI_IP = "192.168.1.100"  # Change this to your actual IP
+RASPBERRY_PI_IP = "192.168.0.168"  # Change this to your actual IP
 url = f"http://192.168.0.168:5000/get_attendance"
 
 st.title("Real-time Attendance System")
